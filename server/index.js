@@ -2,8 +2,6 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import { Queue } from "bull";
-import { jobQueue } from "./utils/redis.js";
 import { fetchAndQueueJobs } from "./services/jobService.js";
 import ImportLog from "./models/ImportLog.js";
 
