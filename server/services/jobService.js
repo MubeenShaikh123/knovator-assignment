@@ -47,7 +47,15 @@ export const fetchAndQueueJobs = async () => {
         };
 
         try {
-          await jobQueue.add("importJob", payload);
+          await jobQueue.add("importJob", payload, {
+            attempts: parseInt(process.env.RETRY_ATTEMPTS || "3"),
+            backoff: {
+              type: "custom",
+              delay: parseInt(process.env.RETRY_BACKOFF || "5000"),
+            },
+            removeOnComplete: true,
+            removeOnFail: false,
+          });
           queued++;
         } catch (err) {
           console.error(`❌ Queue add failed for ${url}:`, err.message);
