@@ -36,13 +36,19 @@ export const fetchAndQueueJobs = async () => {
 
       let queued = 0, failed = 0;
       for (const job of jobs) {
+        // Normalize guid field (handle XML object case)
+        let jobId = job.guid || job.link;
+        if (typeof jobId === "object" && jobId._) jobId = jobId._;
+        if (Array.isArray(jobId)) jobId = jobId[0];
+        if (!jobId) jobId = job.link || `missing-${Math.random()}`;
+
         const payload = {
-          jobId: job.guid || job.link,
-          title: job.title,
-          company: job["job:company"] || "Unknown",
-          category: job["job:category"] || "N/A",
+          jobId: String(jobId).trim(),
+          title: job.title || "Untitled",
+          company: job["job_listing:company"] || job["job:company"] || "Unknown",
+          category: job["job_listing:job_type"] || job["job:category"] || "N/A",
           description: job.description || "",
-          url: job.link,
+          url: job.link || "",
           feedUrl: url,
         };
 

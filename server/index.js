@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cron from "node-cron";
 
-import { jobQueue } from "./utils/redis.js";
+import "./jobs/jobProcessor.js";
 import { fetchAndQueueJobs } from "./services/jobService.js";
 import ImportLog from "./models/ImportLog.js";
 
