@@ -1,14 +1,3 @@
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-dotenv.config();
-
-const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/artha_jobs";
-if (!mongoose.connection.readyState) {
-  mongoose.connect(mongoUri, { dbName: "artha_jobs" })
-    .then(() => console.log("✅ Worker connected to MongoDB"))
-    .catch(err => console.error("❌ Worker MongoDB connection error:", err));
-}
-
 import { jobQueue } from "../utils/redis.js";
 import Job from "../models/Job.js";
 import ImportLog from "../models/ImportLog.js";
@@ -20,9 +9,8 @@ jobQueue.process("importJob", concurrency, async (job) => {
   const { feedUrl, ...data } = job.data;
 
   try {
-    if (!data.jobId) throw new Error("Missing jobId");
-
     const existing = await Job.findOne({ jobId: data.jobId });
+
     if (existing) {
       await Job.updateOne({ jobId: data.jobId }, data);
       return { feedUrl, status: "updated" };
@@ -31,18 +19,18 @@ jobQueue.process("importJob", concurrency, async (job) => {
       return { feedUrl, status: "new" };
     }
   } catch (err) {
-    // Record the error in FailedJob
+    // Save failure reason
     await FailedJob.create({
       feedUrl,
-      jobId: data.jobId || "unknown",
+      jobId: data.jobId,
       error: err.message || "Unknown error",
     });
-    console.error(`❌ Failed to process job (${data.jobId}):`, err.message);
-    return { feedUrl, status: "failed" };
+
+    return { feedUrl, status: "failed", reason: err.message };
   }
 });
 
-// Log batch summary
+// ✅ Aggregate job results and create ImportLog entries
 jobQueue.on("global:completed", async (jobId, resultStr) => {
   try {
     const result = JSON.parse(resultStr);
@@ -61,6 +49,7 @@ jobQueue.on("global:completed", async (jobId, resultStr) => {
     else if (status === "updated") stats.updatedJobs++;
     else if (status === "failed") stats.failedJobs++;
 
+    // After every 50 jobs or at the end of queue, save summary
     if (stats.totalFetched % 50 === 0) {
       await ImportLog.create({
         fileName: feedUrl,
@@ -74,6 +63,6 @@ jobQueue.on("global:completed", async (jobId, resultStr) => {
       delete global.importStats[feedUrl];
     }
   } catch (err) {
-    console.error("⚠️ Error summarizing jobs:", err.message);
+    console.error("⚠️ Error processing job result:", err.message);
   }
 });
